@@ -38,9 +38,6 @@
     <Reference Include="OpenTK, Version=3.3.3.0, Culture=neutral, PublicKeyToken=bad199fe84eb3df4, processorArchitecture=MSIL">
       <HintPath>..\..\packages\OpenTK.3.3.3\lib\net20\OpenTK.dll</HintPath>
     </Reference>
-    <Reference Include="SDL2-CS">
-      <HintPath>lib\SDL2-CS.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
   </ItemGroup>
@@ -51,6 +48,11 @@
     <Compile Include="GLShader.cs" />
     <Compile Include="GLTexture.cs" />
     <Compile Include="GLVertexArray.cs" />
+    <Compile Include="SDL2-CS\LPUtf8StrMarshaler.cs" />
+    <Compile Include="SDL2-CS\SDL2.cs" />
+    <Compile Include="SDL2-CS\SDL2_image.cs" />
+    <Compile Include="SDL2-CS\SDL2_mixer.cs" />
+    <Compile Include="SDL2-CS\SDL2_ttf.cs" />
     <Compile Include="SDL2AudioContext.cs" />
     <Compile Include="SDL2Exception.cs" />
     <Compile Include="GLVertexBuffer.cs" />

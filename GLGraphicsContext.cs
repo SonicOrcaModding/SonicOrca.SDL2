@@ -85,11 +85,11 @@ namespace SonicOrca.SDL2
           {
             case BlendMode.Alpha:
               GL.Enable(EnableCap.Blend);
-              GL.BlendFunc(BlendingFactorSrc.SrcAlpha, BlendingFactorDest.OneMinusSrcAlpha);
+              GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
               break;
             case BlendMode.Additive:
               GL.Enable(EnableCap.Blend);
-              GL.BlendFunc(BlendingFactorSrc.SrcAlpha, BlendingFactorDest.One);
+              GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.One);
               break;
             default:
               GL.Disable(EnableCap.Blend);
