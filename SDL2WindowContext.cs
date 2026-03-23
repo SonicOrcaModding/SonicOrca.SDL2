@@ -168,7 +168,7 @@ namespace SonicOrca.SDL2
         this._glContext = SDL.SDL_GL_CreateContext(this._windowHandle);
         if (this._glContext == IntPtr.Zero)
           throw SDL2Exception.FromError("Unable to create OpenGL context.");
-        this.SetOpenTKOpenGLHandle(this._glContext, this.GetWindowHWND(this._windowHandle));
+        this.SetOpenTKOpenGLHandle(this._glContext, this._windowHandle);
         this.ContextThread = Thread.CurrentThread;
         this._glGraphicsContext = new GLGraphicsContext(this);
         this.ShowWindowWithBlackBackground();
@@ -176,16 +176,21 @@ namespace SonicOrca.SDL2
 
       private void SetIconToAssemblyResource()
       {
+        if (!OperatingSystem.IsWindows())
+          return;
         IntPtr lParam = SDL2WindowContext.User32.LoadIcon(Marshal.GetHINSTANCE(Assembly.GetEntryAssembly().ManifestModule), new IntPtr(32512));
         if (!(lParam != IntPtr.Zero))
           return;
         SDL2WindowContext.User32.SendMessage(this.GetWindowHWND(this._windowHandle), 128U /*0x80*/, new IntPtr(0), lParam);
       }
 
-      private void SetOpenTKOpenGLHandle(IntPtr glHandle, IntPtr windowHandle)
+      private void SetOpenTKOpenGLHandle(IntPtr glHandle, IntPtr sdlWindow)
       {
         Toolkit.Init();
-        Utilities.CreateWindowsWindowInfo(windowHandle);
+        if (OperatingSystem.IsWindows())
+          Utilities.CreateWindowsWindowInfo(this.GetWindowHWND(sdlWindow));
+        else
+          Utilities.CreateSdl2WindowInfo(sdlWindow);
         ContextHandle ch = new ContextHandle(this._glContext);
         ((IGraphicsContextInternal) new OpenTK.Graphics.GraphicsContext(ch, (OpenTK.Graphics.GraphicsContext.GetAddressDelegate) (proc => SDL.SDL_GL_GetProcAddress(proc)), (OpenTK.Graphics.GraphicsContext.GetCurrentContextDelegate) (() => ch))).Implementation.LoadAll();
       }

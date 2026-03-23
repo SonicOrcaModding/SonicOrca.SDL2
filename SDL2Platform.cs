@@ -24,9 +24,6 @@ namespace SonicOrca.SDL2
       private SDL2InputContext _input;
       private SDL2AudioContext _audio;
 
-      [DllImport("kernel32.dll")]
-      private static extern IntPtr LoadLibrary(string path);
-
       public WindowContext Window => (WindowContext) this._window;
 
       public InputContext Input => (InputContext) this._input;
@@ -42,6 +39,7 @@ namespace SonicOrca.SDL2
       public void Initialise()
       {
         this._initialised = !this._initialised ? true : throw new InvalidOperationException("Platform already initialised.");
+        Sdl2NativeLoader.EnsureRegistered();
         Trace.WriteLine("Initialising SDL2 platform");
         Trace.WriteLine("-- SDL2 " + (object) this.GetVersion());
         Trace.Indent();

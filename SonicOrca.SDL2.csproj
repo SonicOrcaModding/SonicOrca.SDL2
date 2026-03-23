@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>SonicOrca.SDL2</RootNamespace>
     <AssemblyName>SonicOrca.SDL2</AssemblyName>
-    <LangVersion>7.3</LangVersion>
+    <LangVersion>12</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
@@ -24,10 +24,5 @@
     <ProjectReference Include="..\SonicOrca.Common\SonicOrca.Common.csproj" />
     <ProjectReference Include="..\SonicOrca.Resources\SonicOrca.Resources.csproj" />
     <ProjectReference Include="..\SonicOrca\SonicOrca.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="OpenTK.dll.config">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 </Project>
