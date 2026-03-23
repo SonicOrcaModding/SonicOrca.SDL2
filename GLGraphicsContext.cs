@@ -102,11 +102,20 @@ namespace SonicOrca.SDL2
       {
         get
         {
+#if __ANDROID__
+          return SonicOrca.Graphics.PolygonMode.Fill;
+#else
           int data;
           GL.GetInteger(GetPName.PolygonMode, out data);
           return (SonicOrca.Graphics.PolygonMode) (data - 6912);
+#endif
         }
-        set => GL.PolygonMode(MaterialFace.FrontAndBack, (OpenTK.Graphics.OpenGL.PolygonMode) (6912 + value));
+        set
+        {
+#if !__ANDROID__
+          GL.PolygonMode(MaterialFace.FrontAndBack, (OpenTK.Graphics.OpenGL.PolygonMode) (6912 + value));
+#endif
+        }
       }
 
       public IFramebuffer CurrentFramebuffer { get; internal set; }
@@ -222,7 +231,10 @@ namespace SonicOrca.SDL2
 
       public void ClearDepthBuffer() => GL.Clear(ClearBufferMask.DepthBufferBit);
 
-      public void ClearColourBuffer(int index) => GL.ClearBuffer(OpenTK.Graphics.OpenGL.ClearBuffer.Color, index, new int[4]);
+      public void ClearColourBuffer(int index)
+      {
+        OpenTK.Graphics.OpenGL.GL.ClearBuffer(OpenTK.Graphics.OpenGL.ClearBuffer.Color, index, new int[4]);
+      }
 
       public IBuffer CreateBuffer() => (IBuffer) new GLBuffer(this);
 

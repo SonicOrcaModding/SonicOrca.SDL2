@@ -150,7 +150,14 @@ namespace SonicOrca.SDL2
         Trace.WriteLine("Initialising SDL2 video");
         if (SDL.SDL_InitSubSystem(32U /*0x20*/) != 0)
           throw SDL2Exception.FromError("Unable to initialise a video driver.");
+#if __ANDROID__
+        SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_CONTEXT_PROFILE_MASK, (int)SDL.SDL_GLprofile.SDL_GL_CONTEXT_PROFILE_ES);
+        SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+        SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_CONTEXT_MINOR_VERSION, 0);
+        SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_MULTISAMPLESAMPLES, 0);
+#else
         SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_MULTISAMPLESAMPLES, 1);
+#endif
         SDL.SDL_GL_SetSwapInterval(1);
         SDL.SDL_DisplayMode mode;
         SDL.SDL_GetDesktopDisplayMode(0, out mode);

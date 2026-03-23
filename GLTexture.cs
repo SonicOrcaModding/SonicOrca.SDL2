@@ -87,10 +87,14 @@ namespace SonicOrca.SDL2
         this.Height = height;
         this._glId = GL.GenTexture();
         GL.BindTexture(TextureTarget.Texture2D, this._glId);
+#if __ANDROID__
+        GL.TexImage2D<byte>(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, width, height, 0, channels == 3 ? PixelFormat.Rgb : PixelFormat.Rgba, PixelType.UnsignedByte, argb);
+#else
         if (toCompress)
           GL.TexImage2D<byte>(TextureTarget.Texture2D, 0, PixelInternalFormat.CompressedRgbaS3tcDxt1Ext, width, height, 0, channels == 3 ? PixelFormat.Rgb : PixelFormat.Rgba, PixelType.UnsignedByte, argb);
         else
           GL.TexImage2D<byte>(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, width, height, 0, channels == 3 ? PixelFormat.Rgb : PixelFormat.Rgba, PixelType.UnsignedByte, argb);
+#endif
         this._filtering = TextureFiltering.Linear;
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, 9729);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, 9729);
@@ -113,7 +117,11 @@ namespace SonicOrca.SDL2
       public byte[] GetArgbData()
       {
         byte[] pixels = new byte[this.Width * this.Height * 4];
+#if __ANDROID__
+        GL.ReadPixels(0, 0, this.Width, this.Height, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);
+#else
         GL.GetTexImage<byte>(TextureTarget.Texture2D, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);
+#endif
         int num1 = this.Width * 4;
         for (int index1 = 0; index1 < this.Height / 2; ++index1)
         {

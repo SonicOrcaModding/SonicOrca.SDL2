@@ -15,7 +15,7 @@ namespace SonicOrca.SDL2
 
     internal class GLShader : IShader, IDisposable
     {
-      private static readonly IReadOnlyList<OpenTK.Graphics.OpenGL.ShaderType> ShaderTypeConversionTable = (IReadOnlyList<OpenTK.Graphics.OpenGL.ShaderType>) new OpenTK.Graphics.OpenGL.ShaderType[6]
+      private static readonly IReadOnlyList<OpenTK.Graphics.OpenGL.ShaderType> ShaderTypeConversionTable = new OpenTK.Graphics.OpenGL.ShaderType[6]
       {
         OpenTK.Graphics.OpenGL.ShaderType.FragmentShader,
         OpenTK.Graphics.OpenGL.ShaderType.VertexShader,
@@ -32,6 +32,10 @@ namespace SonicOrca.SDL2
 
       public GLShader(SonicOrca.Graphics.ShaderType type, string sourceCode)
       {
+#if __ANDROID__
+        if (type != SonicOrca.Graphics.ShaderType.Fragment && type != SonicOrca.Graphics.ShaderType.Vertex)
+          throw new SDL2Exception("Only vertex and fragment shaders are supported on OpenGL ES.");
+#endif
         this._type = GLShader.ShaderTypeConversionTable[(int) type];
         this._sourceCode = sourceCode;
         this._glId = GL.CreateShader(this._type);

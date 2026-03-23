@@ -14,29 +14,16 @@ namespace SonicOrca.SDL2
 
     internal class GLVertexArray : IVertexArray, IDisposable
     {
-      private static readonly IReadOnlyList<OpenTK.Graphics.OpenGL.PrimitiveType> BeginModesForPrimitiveTypes = (IReadOnlyList<OpenTK.Graphics.OpenGL.PrimitiveType>) new OpenTK.Graphics.OpenGL.PrimitiveType[10]
-      {
-        OpenTK.Graphics.OpenGL.PrimitiveType.Points,
-        OpenTK.Graphics.OpenGL.PrimitiveType.Lines,
-        OpenTK.Graphics.OpenGL.PrimitiveType.LineStrip,
-        OpenTK.Graphics.OpenGL.PrimitiveType.LineLoop,
-        OpenTK.Graphics.OpenGL.PrimitiveType.Triangles,
-        OpenTK.Graphics.OpenGL.PrimitiveType.TriangleStrip,
-        OpenTK.Graphics.OpenGL.PrimitiveType.TriangleFan,
-        OpenTK.Graphics.OpenGL.PrimitiveType.Quads,
-        OpenTK.Graphics.OpenGL.PrimitiveType.QuadStrip,
-        OpenTK.Graphics.OpenGL.PrimitiveType.Polygon
-      };
       private readonly GLGraphicsContext _context;
       private readonly int _id;
 
       public GLVertexArray(GLGraphicsContext context)
       {
         this._context = context;
-        this._id = GL.GenVertexArray();
+        GL.GenVertexArrays(1, out this._id);
       }
 
-      public void Dispose() => GL.DeleteVertexArray(this._id);
+      public void Dispose() => GL.DeleteVertexArrays(1, new int[1] { this._id });
 
       public void Bind() => GL.BindVertexArray(this._id);
 
@@ -54,7 +41,7 @@ namespace SonicOrca.SDL2
       public void Render(SonicOrca.Graphics.PrimitiveType type, int index, int count)
       {
         this.Bind();
-        GL.DrawArrays(GLVertexArray.BeginModesForPrimitiveTypes[(int) type], index, count);
+        GlPrimitiveDraw.DrawArrays(type, index, count);
       }
     }
 }

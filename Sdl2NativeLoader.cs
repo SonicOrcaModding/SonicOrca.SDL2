@@ -47,6 +47,10 @@ namespace SonicOrca.SDL2
         {
             if (string.Equals(libraryName, "SDL2.dll", StringComparison.OrdinalIgnoreCase))
             {
+#if __ANDROID__
+                yield return "libSDL2.so";
+                yield return "SDL2";
+#endif
                 yield return "libSDL2-2.0.so.0";
                 yield return "libSDL2-2.0.so";
                 yield return "libSDL2.so";

@@ -20,10 +20,10 @@ namespace SonicOrca.SDL2
       public GLBuffer(GLGraphicsContext context)
       {
         this._context = context;
-        this._id = GL.GenBuffer();
+        GL.GenBuffers(1, out this._id);
       }
 
-      public void Dispose() => GL.DeleteBuffer(this._id);
+      public void Dispose() => GL.DeleteBuffers(1, new int[1] { this._id });
 
       public void Bind() => GL.BindBuffer(BufferTarget.ArrayBuffer, this._id);
 
