@@ -87,7 +87,12 @@ namespace SonicOrca.SDL2
       {
         int num1 = 0;
         this.TextInput = (string) null;
+#if !__ANDROID__
         SDL.SDL_StartTextInput();
+#else
+        if (SDL.SDL_IsTextInputActive() != SDL.SDL_bool.SDL_FALSE)
+          SDL.SDL_StopTextInput();
+#endif
         int num2 = SDL.SDL_PeepEvents(this.events, this.events.Length, SDL.SDL_eventaction.SDL_PEEKEVENT, SDL.SDL_EventType.SDL_FIRSTEVENT, SDL.SDL_EventType.SDL_LASTEVENT);
         SDL.SDL_Event _event;
         for (int index1 = 0; index1 < num2; ++index1)

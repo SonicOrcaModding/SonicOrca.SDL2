@@ -70,6 +70,10 @@ namespace SonicOrca.SDL2
         get => this._mode;
         set
         {
+#if __ANDROID__
+          if (value == VideoMode.Windowed)
+            value = VideoMode.WindowedBorderless;
+#endif
           if (this._mode == value)
             return;
           this._mode = value;
@@ -86,7 +90,9 @@ namespace SonicOrca.SDL2
           SDL.SDL_SetWindowFullscreen(this._windowHandle, flags);
           if (value != VideoMode.Windowed)
             return;
+#if !__ANDROID__
           this.UpdateWindowSize(new Vector2i(1920, 1080));
+#endif
         }
       }
 
@@ -161,12 +167,28 @@ namespace SonicOrca.SDL2
         SDL.SDL_GL_SetSwapInterval(1);
         SDL.SDL_DisplayMode mode;
         SDL.SDL_GetDesktopDisplayMode(0, out mode);
-        int num1 = 1920;
+        int num1;
         int num2;
+#if __ANDROID__
+        num1 = mode.w > 0 ? mode.w : 1920;
+        num2 = mode.h > 0 ? mode.h : 1080;
+#else
+        num1 = 1920;
         for (num2 = 1080; num1 > mode.w || num2 > mode.h; num2 -= 270)
           num1 -= 480;
+#endif
         Trace.WriteLine("Creating window");
+#if __ANDROID__
+        this._windowHandle = SDL.SDL_CreateWindow(
+          this._windowTitle,
+          SDL.SDL_WINDOWPOS_CENTERED,
+          SDL.SDL_WINDOWPOS_CENTERED,
+          num1,
+          num2,
+          SDL.SDL_WindowFlags.SDL_WINDOW_OPENGL);
+#else
         this._windowHandle = SDL.SDL_CreateWindow(this._windowTitle, 805240832, 805240832, num1, num2, SDL.SDL_WindowFlags.SDL_WINDOW_OPENGL | SDL.SDL_WindowFlags.SDL_WINDOW_HIDDEN | SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE);
+#endif
         if (this._windowHandle == IntPtr.Zero)
           throw SDL2Exception.FromError("Unable to create window.");
         this._clientSize = new Vector2i(num1, num2);
@@ -290,12 +312,42 @@ namespace SonicOrca.SDL2
         GL.ClearColor(0.0f, 0.0f, 0.0f, 1f);
         SDL.SDL_GL_SwapWindow(this._windowHandle);
         SDL.SDL_ShowWindow(this._windowHandle);
+#if __ANDROID__
+        SDL.SDL_SetWindowFullscreen(this._windowHandle, (uint)SDL.SDL_WindowFlags.SDL_WINDOW_FULLSCREEN_DESKTOP);
+        SDL.SDL_StopTextInput();
+#endif
       }
 
       private void UpdateWindowSize() => this.UpdateWindowSize(this._clientSize);
 
       private void UpdateWindowSize(Vector2i size)
       {
+#if __ANDROID__
+        this._clientSize = size;
+        if (this._aspectRatio.X > 0 && this._aspectRatio.Y > 0)
+        {
+          double targetAspect = (double) this._aspectRatio.X / (double) this._aspectRatio.Y;
+          double surfaceAspect = (double) size.X / (double) size.Y;
+          int viewportX = 0;
+          int viewportY = 0;
+          int viewportWidth = size.X;
+          int viewportHeight = size.Y;
+          if (surfaceAspect > targetAspect)
+          {
+            viewportWidth = (int) Math.Round((double) size.Y * targetAspect);
+            viewportX = (size.X - viewportWidth) / 2;
+          }
+          else if (surfaceAspect < targetAspect)
+          {
+            viewportHeight = (int) Math.Round((double) size.X / targetAspect);
+            viewportY = (size.Y - viewportHeight) / 2;
+          }
+          GL.Viewport(viewportX, viewportY, viewportWidth, viewportHeight);
+          return;
+        }
+        GL.Viewport(0, 0, size.X, size.Y);
+        return;
+#else
         if (this._aspectRatio.X != 0 || this._aspectRatio.Y != 0)
         {
           double num = (double) this._aspectRatio.X / (double) this._aspectRatio.Y;
@@ -307,6 +359,7 @@ namespace SonicOrca.SDL2
         this._clientSize = size;
         SDL.SDL_SetWindowSize(this._windowHandle, size.X, size.Y);
         GL.Viewport(0, 0, size.X, size.Y);
+#endif
       }
 
       private static class User32

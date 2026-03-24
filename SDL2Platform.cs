@@ -40,6 +40,9 @@ namespace SonicOrca.SDL2
       {
         this._initialised = !this._initialised ? true : throw new InvalidOperationException("Platform already initialised.");
         Sdl2NativeLoader.EnsureRegistered();
+#if __ANDROID__
+        SDL.SDL_SetMainReady();
+#endif
         Trace.WriteLine("Initialising SDL2 platform");
         Trace.WriteLine("-- SDL2 " + (object) this.GetVersion());
         Trace.Indent();
