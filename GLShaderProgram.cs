@@ -18,6 +18,7 @@ namespace SonicOrca.SDL2
       private readonly GLGraphicsContext _context;
       private readonly int _glId;
       private readonly Dictionary<string, int> _uniformLocations = new Dictionary<string, int>();
+      private readonly float[] _matrixUniformScratch = new float[16];
 
       public GLShaderProgram(GLGraphicsContext context, IEnumerable<GLShader> shaders)
       {
@@ -118,25 +119,24 @@ namespace SonicOrca.SDL2
         int uniformLocation = this.GetUniformLocation(name);
         if (uniformLocation < 0)
           return;
-        GL.UniformMatrix4(uniformLocation, 1, false, new float[16 /*0x10*/]
-        {
-          (float) value.M11,
-          (float) value.M21,
-          (float) value.M31,
-          (float) value.M41,
-          (float) value.M12,
-          (float) value.M22,
-          (float) value.M32,
-          (float) value.M42,
-          (float) value.M13,
-          (float) value.M23,
-          (float) value.M33,
-          (float) value.M43,
-          (float) value.M14,
-          (float) value.M24,
-          (float) value.M34,
-          (float) value.M44
-        });
+        float[] m = this._matrixUniformScratch;
+        m[0] = (float) value.M11;
+        m[1] = (float) value.M21;
+        m[2] = (float) value.M31;
+        m[3] = (float) value.M41;
+        m[4] = (float) value.M12;
+        m[5] = (float) value.M22;
+        m[6] = (float) value.M32;
+        m[7] = (float) value.M42;
+        m[8] = (float) value.M13;
+        m[9] = (float) value.M23;
+        m[10] = (float) value.M33;
+        m[11] = (float) value.M43;
+        m[12] = (float) value.M14;
+        m[13] = (float) value.M24;
+        m[14] = (float) value.M34;
+        m[15] = (float) value.M44;
+        GL.UniformMatrix4(uniformLocation, 1, false, m);
       }
 
       public void SetUniform(string name, Colour value)
