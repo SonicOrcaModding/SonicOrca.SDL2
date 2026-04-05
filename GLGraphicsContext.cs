@@ -217,6 +217,32 @@ namespace SonicOrca.SDL2
         int x2 = clientSize2.X;
         clientSize2 = this._videoAdapter.ClientSize;
         int y2 = clientSize2.Y;
+#if __ANDROID__
+        GL.Viewport(0, 0, x2, y2);
+        GL.Clear(ClearBufferMask.ColorBufferBit);
+        Vector2i aspectRatio = this._videoAdapter.AspectRatio;
+        if (aspectRatio.X > 0 && aspectRatio.Y > 0)
+        {
+          double targetAspect = (double) aspectRatio.X / (double) aspectRatio.Y;
+          double surfaceAspect = (double) x2 / (double) y2;
+          int viewportX = 0;
+          int viewportY = 0;
+          int viewportWidth = x2;
+          int viewportHeight = y2;
+          if (surfaceAspect > targetAspect)
+          {
+            viewportWidth = (int) Math.Round((double) y2 * targetAspect);
+            viewportX = (x2 - viewportWidth) / 2;
+          }
+          else if (surfaceAspect < targetAspect)
+          {
+            viewportHeight = (int) Math.Round((double) x2 / targetAspect);
+            viewportY = (y2 - viewportHeight) / 2;
+          }
+          GL.Viewport(viewportX, viewportY, viewportWidth, viewportHeight);
+          return;
+        }
+#endif
         GL.Viewport(0, 0, x2, y2);
       }
 

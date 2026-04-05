@@ -24,6 +24,15 @@ namespace SonicOrca.SDL2
       private readonly List<IntPtr> _gameControllers = new List<IntPtr>();
       private readonly List<IntPtr> _haptic = new List<IntPtr>();
       private SDL.SDL_Event[] events = new SDL.SDL_Event[512 /*0x0200*/];
+#if __ANDROID__
+      private const double AndroidTouchDpadXFactor = 48.0 / 320.0;
+      private const double AndroidTouchDpadYFactor = 192.0 / 240.0;
+      private const double AndroidTouchDpadDeadFactor = 12.0 / 320.0;
+      private const double AndroidTouchLeftZoneXFactor = 96.0 / 320.0;
+      private const double AndroidTouchBottomZoneYFactor = 144.0 / 240.0;
+      private const double AndroidTouchJumpRegionStartFactor = 1.0 - 80.0 / 320.0;
+      private const double AndroidTouchPauseSizeFactor = 72.0 / 320.0;
+#endif
 
       public SDL2InputContext(SDL2Platform platform)
       {
@@ -167,6 +176,9 @@ namespace SonicOrca.SDL2
           gamePadInputState.RightTrigger = this.GetGameControllerAxis(gameController, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_TRIGGERRIGHT, minTolerance, maxTolerance);
           array[index] = gamePadInputState;
         }
+#if __ANDROID__
+        this.ApplyAndroidTouchControls(array);
+#endif
         this.CurrentState = new InputState(mouseState2, keyboardState2, array);
         GamePadOutputState[] gamePad = this.OutputState.GamePad;
         if (!this.IsVibrationEnabled || this.OutputState.GamePad == null)
@@ -179,6 +191,96 @@ namespace SonicOrca.SDL2
       {
         return SDL.SDL_GameControllerGetButton(controller, button) > (byte) 0;
       }
+
+#if __ANDROID__
+      private void ApplyAndroidTouchControls(GamePadInputState[] gamePadStates)
+      {
+        if (gamePadStates == null || gamePadStates.Length == 0)
+          return;
+        SDL.SDL_GetWindowSize(this._windowHandle, out int windowWidth, out int windowHeight);
+        if (windowWidth <= 0 || windowHeight <= 0)
+          return;
+        int viewportX = 0;
+        int viewportY = 0;
+        int viewportWidth = windowWidth;
+        int viewportHeight = windowHeight;
+        Vector2i aspectRatio = this._platform.Window.AspectRatio;
+        if (aspectRatio.X > 0 && aspectRatio.Y > 0)
+        {
+          double targetAspect = (double) aspectRatio.X / (double) aspectRatio.Y;
+          double surfaceAspect = (double) windowWidth / (double) windowHeight;
+          if (surfaceAspect > targetAspect)
+          {
+            viewportWidth = (int) Math.Round((double) windowHeight * targetAspect);
+            viewportX = (windowWidth - viewportWidth) / 2;
+          }
+          else if (surfaceAspect < targetAspect)
+          {
+            viewportHeight = (int) Math.Round((double) windowWidth / targetAspect);
+            viewportY = (windowHeight - viewportHeight) / 2;
+          }
+        }
+        double dpadX = viewportX + viewportWidth * AndroidTouchDpadXFactor;
+        double dpadY = viewportY + viewportHeight * AndroidTouchDpadYFactor;
+        double dpadDead = viewportWidth * AndroidTouchDpadDeadFactor;
+        double leftZoneX = viewportX + viewportWidth * AndroidTouchLeftZoneXFactor;
+        double bottomZoneY = viewportY + viewportHeight * AndroidTouchBottomZoneYFactor;
+        double jumpRegionStart = viewportX + viewportWidth * AndroidTouchJumpRegionStartFactor;
+        double pauseButtonSize = Math.Min(viewportWidth, viewportHeight) * AndroidTouchPauseSizeFactor;
+        bool touchUp = false;
+        bool touchDown = false;
+        bool touchLeft = false;
+        bool touchRight = false;
+        bool touchJump = false;
+        bool touchPause = false;
+        int numTouchDevices = SDL.SDL_GetNumTouchDevices();
+        for (int deviceIndex = 0; deviceIndex < numTouchDevices; ++deviceIndex)
+        {
+          long touchDevice = SDL.SDL_GetTouchDevice(deviceIndex);
+          int numFingers = SDL.SDL_GetNumTouchFingers(touchDevice);
+          for (int fingerIndex = 0; fingerIndex < numFingers; ++fingerIndex)
+          {
+            IntPtr touchFingerPtr = SDL.SDL_GetTouchFinger(touchDevice, fingerIndex);
+            if (touchFingerPtr == IntPtr.Zero)
+              continue;
+            SDL.SDL_Finger structure = Marshal.PtrToStructure<SDL.SDL_Finger>(touchFingerPtr);
+            double tx = structure.x * windowWidth;
+            double ty = structure.y * windowHeight;
+            if (tx >= viewportX && tx <= viewportX + viewportWidth && ty >= viewportY && ty <= viewportY + viewportHeight && tx < leftZoneX && ty > bottomZoneY)
+            {
+              double dx = tx - dpadX;
+              double dy = ty - dpadY;
+              if (dx < -dpadDead)
+                touchLeft = true;
+              if (dx > dpadDead)
+                touchRight = true;
+              if (dy < -dpadDead)
+                touchUp = true;
+              if (dy > dpadDead)
+                touchDown = true;
+            }
+            if (tx >= viewportX && tx <= viewportX + viewportWidth && ty >= viewportY && ty <= viewportY + viewportHeight && tx > jumpRegionStart && ty > bottomZoneY)
+              touchJump = true;
+            if (tx > viewportX + viewportWidth - pauseButtonSize && ty < viewportY + pauseButtonSize)
+              touchPause = true;
+          }
+        }
+        GamePadInputState gamePadState = gamePadStates[0];
+        Vector2i pov = gamePadState.POV;
+        if (touchLeft && !touchRight)
+          pov.X = -1;
+        else if (touchRight && !touchLeft)
+          pov.X = 1;
+        if (touchUp && !touchDown)
+          pov.Y = -1;
+        else if (touchDown && !touchUp)
+          pov.Y = 1;
+        gamePadState.POV = pov;
+        gamePadState.South = gamePadState.South || touchJump;
+        gamePadState.Start = gamePadState.Start || touchPause;
+        gamePadStates[0] = gamePadState;
+      }
+#endif
 
       private Vector2 GetGameControllerAxis(
         IntPtr controller,
