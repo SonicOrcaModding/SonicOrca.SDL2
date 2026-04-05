@@ -39,10 +39,12 @@ namespace SonicOrca.SDL2
         if (SDL.SDL_InitSubSystem(4096U /*0x1000*/) != 0)
           throw SDL2Exception.FromError("Unable to initialise SDL2 haptic subsystem.");
         this.FindGameControllers();
+        SDL.SDL_StopTextInput();
       }
 
       public void Dispose()
       {
+        SDL.SDL_StopTextInput();
         Trace.WriteLine("Quitting SDL2 haptic");
         SDL.SDL_QuitSubSystem(4096U /*0x1000*/);
         Trace.WriteLine("Quitting SDL2 game controller");
@@ -87,7 +89,6 @@ namespace SonicOrca.SDL2
       {
         int num1 = 0;
         this.TextInput = (string) null;
-        SDL.SDL_StartTextInput();
         int num2 = SDL.SDL_PeepEvents(this.events, this.events.Length, SDL.SDL_eventaction.SDL_PEEKEVENT, SDL.SDL_EventType.SDL_FIRSTEVENT, SDL.SDL_EventType.SDL_LASTEVENT);
         SDL.SDL_Event _event;
         for (int index1 = 0; index1 < num2; ++index1)
