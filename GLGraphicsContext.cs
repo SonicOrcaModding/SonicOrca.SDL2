@@ -23,6 +23,9 @@ namespace SonicOrca.SDL2
       private readonly List<IShaderProgram> _shaderPrograms = new List<IShaderProgram>();
       private readonly List<VertexBuffer> _vertexBuffers = new List<VertexBuffer>();
       private readonly List<IFramebuffer> _renderTargets = new List<IFramebuffer>();
+      private GLFramebuffer _cachedBackBuffer;
+      private int _cachedBackBufferW;
+      private int _cachedBackBufferH;
 
       internal ICollection<ITexture> Textures => (ICollection<ITexture>) this._textures;
 
@@ -211,7 +214,13 @@ namespace SonicOrca.SDL2
         int x1 = clientSize1.X;
         clientSize1 = this._videoAdapter.ClientSize;
         int y1 = clientSize1.Y;
-        this.CurrentFramebuffer = (IFramebuffer) GLFramebuffer.FromBackBuffer(this, x1, y1);
+        if (this._cachedBackBuffer == null || this._cachedBackBufferW != x1 || this._cachedBackBufferH != y1)
+        {
+          this._cachedBackBuffer = GLFramebuffer.FromBackBuffer(this, x1, y1);
+          this._cachedBackBufferW = x1;
+          this._cachedBackBufferH = y1;
+        }
+        this.CurrentFramebuffer = (IFramebuffer) this._cachedBackBuffer;
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         Vector2i clientSize2 = this._videoAdapter.ClientSize;
         int x2 = clientSize2.X;

@@ -37,6 +37,9 @@ namespace SonicOrca.SDL2
       private uint _lastMouseMovementTickCount;
       private bool _showingCursor = true;
       private SDL.SDL_Event[] events = new SDL.SDL_Event[512 /*0x0200*/];
+#if __ANDROID__
+      public static volatile bool AndroidSuspended;
+#endif
 
       public IntPtr WindowHandle => this._windowHandle;
 
@@ -243,6 +246,21 @@ namespace SonicOrca.SDL2
 
       public override void Update()
       {
+#if __ANDROID__
+        if (AndroidSuspended)
+        {
+          var audio = this._platform.Audio as SDL2AudioContext;
+          audio?.PauseDevice();
+
+          while (AndroidSuspended && !this.Finished)
+            Thread.Sleep(100);
+
+          if (this.Finished)
+            return;
+
+          audio?.ResumeDevice();
+        }
+#endif
         uint ticks = SDL.SDL_GetTicks();
         SDL.SDL_PumpEvents();
         int num = SDL.SDL_PeepEvents(this.events, this.events.Length, SDL.SDL_eventaction.SDL_PEEKEVENT, SDL.SDL_EventType.SDL_FIRSTEVENT, SDL.SDL_EventType.SDL_LASTEVENT);
@@ -293,6 +311,9 @@ namespace SonicOrca.SDL2
 
       public override void BeginRender()
       {
+#if __ANDROID__
+        SDL.SDL_GL_MakeCurrent(this._windowHandle, this._glContext);
+#endif
         GL.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         this._glGraphicsContext.BlendMode = BlendMode.Alpha;
         this._glGraphicsContext.RenderToBackBuffer();
@@ -300,8 +321,10 @@ namespace SonicOrca.SDL2
 
       public override void EndRender()
       {
+#if !__ANDROID__
         if (!SonicOrcaGameContext.IsMaxPerformance)
           GL.Finish();
+#endif
         SDL.SDL_GL_SwapWindow(this._windowHandle);
       }
 

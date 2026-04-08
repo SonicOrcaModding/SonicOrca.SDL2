@@ -26,10 +26,37 @@ namespace SonicOrca.SDL2
         }
 
 #if __ANDROID__
+        private const int MaxPooledQuads = 1024;
+        private static readonly ushort[] _pooledIndices = new ushort[MaxPooledQuads * 6];
+        private static readonly GCHandle _pooledHandle;
+
+        static GlPrimitiveDraw()
+        {
+            for (int i = 0; i < MaxPooledQuads; i++)
+            {
+                int b = i * 4;
+                int w = i * 6;
+                _pooledIndices[w]     = (ushort)b;
+                _pooledIndices[w + 1] = (ushort)(b + 1);
+                _pooledIndices[w + 2] = (ushort)(b + 2);
+                _pooledIndices[w + 3] = (ushort)b;
+                _pooledIndices[w + 4] = (ushort)(b + 2);
+                _pooledIndices[w + 5] = (ushort)(b + 3);
+            }
+            _pooledHandle = GCHandle.Alloc(_pooledIndices, GCHandleType.Pinned);
+        }
+
         private static void DrawQuadsAsTriangles(int first, int vertexCount)
         {
             int nq = vertexCount / 4;
             int indexCount = nq * 6;
+
+            if (first == 0 && nq <= MaxPooledQuads)
+            {
+                GL.DrawElements(OpenTK.Graphics.OpenGL.PrimitiveType.Triangles, indexCount, DrawElementsType.UnsignedShort, _pooledHandle.AddrOfPinnedObject());
+                return;
+            }
+
             ushort[] indices = new ushort[indexCount];
             int w = 0;
             for (int i = 0; i < nq; i++)

@@ -20,6 +20,8 @@ namespace SonicOrca.SDL2
       private readonly Lockable<List<ISampleProvider>> _registeredSampleProviders = new Lockable<List<ISampleProvider>>(new List<ISampleProvider>());
       private uint _outputDevice;
       private SDL.SDL_AudioSpec _outputAudioSpec;
+      private byte[] _callbackBuffer;
+      private ISampleProvider[] _providerCache = Array.Empty<ISampleProvider>();
 
       public SDL2AudioContext(SDL2Platform platform)
       {
@@ -40,6 +42,10 @@ namespace SonicOrca.SDL2
           throw SDL2Exception.FromError("Unable to create output buffer.");
         SDL.SDL_PauseAudioDevice(this._outputDevice, 0);
       }
+
+      public void PauseDevice() => SDL.SDL_PauseAudioDevice(this._outputDevice, 1);
+
+      public void ResumeDevice() => SDL.SDL_PauseAudioDevice(this._outputDevice, 0);
 
       public void Dispose()
       {
@@ -62,15 +68,24 @@ namespace SonicOrca.SDL2
 
       private void ReadDataCallback(IntPtr userdata, IntPtr stream, int length)
       {
-        byte[] numArray = new byte[length];
+        if (this._callbackBuffer == null || this._callbackBuffer.Length < length)
+          this._callbackBuffer = new byte[length];
+        else
+          Array.Clear(this._callbackBuffer, 0, length);
+
         if (this.Mixer != null)
         {
-          ISampleProvider[] array;
+          int count;
           lock (this._registeredSampleProviders.Sync)
-            array = this._registeredSampleProviders.Instance.ToArray();
-          this.Mixer.Mix(numArray, 0, length, (IEnumerable<ISampleProvider>) array);
+          {
+            count = this._registeredSampleProviders.Instance.Count;
+            if (this._providerCache.Length < count)
+              this._providerCache = new ISampleProvider[count];
+            this._registeredSampleProviders.Instance.CopyTo(this._providerCache, 0);
+          }
+          this.Mixer.Mix(this._callbackBuffer, 0, length, (IEnumerable<ISampleProvider>) new ArraySegment<ISampleProvider>(this._providerCache, 0, count));
         }
-        Marshal.Copy(numArray, 0, stream, length);
+        Marshal.Copy(this._callbackBuffer, 0, stream, length);
       }
     }
 }
