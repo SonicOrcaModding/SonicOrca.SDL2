@@ -32,8 +32,9 @@ namespace SonicOrca.SDL2
       private const double AndroidTouchBottomZoneYFactor = 144.0 / 240.0;
       private const double AndroidTouchJumpRegionStartFactor = 1.0 - 80.0 / 320.0;
       private const double AndroidTouchPauseSizeFactor = 72.0 / 320.0;
+      private long _joystickTouchDevice = -1;
+      private long _joystickFingerId;
 #endif
-
       public SDL2InputContext(SDL2Platform platform)
       {
         this._platform = platform;
@@ -195,90 +196,124 @@ namespace SonicOrca.SDL2
 #if __ANDROID__
       private void ApplyAndroidTouchControls(GamePadInputState[] gamePadStates)
       {
-        if (gamePadStates == null || gamePadStates.Length == 0)
-          return;
-        SDL.SDL_GetWindowSize(this._windowHandle, out int windowWidth, out int windowHeight);
-        if (windowWidth <= 0 || windowHeight <= 0)
-          return;
-        int viewportX = 0;
-        int viewportY = 0;
-        int viewportWidth = windowWidth;
-        int viewportHeight = windowHeight;
-        Vector2i aspectRatio = this._platform.Window.AspectRatio;
-        if (aspectRatio.X > 0 && aspectRatio.Y > 0)
-        {
-          double targetAspect = (double) aspectRatio.X / (double) aspectRatio.Y;
-          double surfaceAspect = (double) windowWidth / (double) windowHeight;
-          if (surfaceAspect > targetAspect)
+          if (gamePadStates == null || gamePadStates.Length == 0)
+              return;
+          SDL.SDL_GetWindowSize(this._windowHandle, out int windowWidth, out int windowHeight);
+          if (windowWidth <= 0 || windowHeight <= 0)
+              return;
+
+          int viewportX = 0, viewportY = 0;
+          int viewportWidth = windowWidth, viewportHeight = windowHeight;
+          Vector2i aspectRatio = this._platform.Window.AspectRatio;
+          if (aspectRatio.X > 0 && aspectRatio.Y > 0)
           {
-            viewportWidth = (int) Math.Round((double) windowHeight * targetAspect);
-            viewportX = (windowWidth - viewportWidth) / 2;
+              double targetAspect = (double)aspectRatio.X / aspectRatio.Y;
+              double surfaceAspect = (double)windowWidth / windowHeight;
+              if (surfaceAspect > targetAspect)
+              {
+                  viewportWidth = (int)Math.Round(windowHeight * targetAspect);
+                  viewportX = (windowWidth - viewportWidth) / 2;
+              }
+              else if (surfaceAspect < targetAspect)
+              {
+                  viewportHeight = (int)Math.Round(windowWidth / targetAspect);
+                  viewportY = (windowHeight - viewportHeight) / 2;
+              }
           }
-          else if (surfaceAspect < targetAspect)
+
+          double dpadX          = viewportX + viewportWidth  * AndroidTouchDpadXFactor;
+          double dpadY          = viewportY + viewportHeight * AndroidTouchDpadYFactor;
+          double dpadDead       = viewportWidth * AndroidTouchDpadDeadFactor;
+          double leftZoneX      = viewportX + viewportWidth  * AndroidTouchLeftZoneXFactor;
+          double bottomZoneY    = viewportY + viewportHeight * AndroidTouchBottomZoneYFactor;
+          double jumpRegionStart = viewportX + viewportWidth * AndroidTouchJumpRegionStartFactor;
+          double pauseButtonSize = Math.Min(viewportWidth, viewportHeight) * AndroidTouchPauseSizeFactor;
+          double joystickMaxRadius = Math.Min(viewportWidth, viewportHeight) * 0.13;
+
+          bool   touchJump          = false;
+          bool   touchPause         = false;
+          double joystickX          = 0.0;
+          double joystickY          = 0.0;
+          bool   joystickTouched    = false;
+          bool   trackedFingerFound = false;
+
+          bool lookingForNew = (_joystickTouchDevice < 0);
+
+          int numTouchDevices = SDL.SDL_GetNumTouchDevices();
+          for (int deviceIndex = 0; deviceIndex < numTouchDevices; ++deviceIndex)
           {
-            viewportHeight = (int) Math.Round((double) windowWidth / targetAspect);
-            viewportY = (windowHeight - viewportHeight) / 2;
+              long touchDevice = SDL.SDL_GetTouchDevice(deviceIndex);
+              int  numFingers  = SDL.SDL_GetNumTouchFingers(touchDevice);
+              for (int fingerIndex = 0; fingerIndex < numFingers; ++fingerIndex)
+              {
+                  IntPtr ptr = SDL.SDL_GetTouchFinger(touchDevice, fingerIndex);
+                  if (ptr == IntPtr.Zero) continue;
+                  SDL.SDL_Finger f = Marshal.PtrToStructure<SDL.SDL_Finger>(ptr);
+
+                  double tx = f.x * windowWidth;
+                  double ty = f.y * windowHeight;
+
+                  bool inViewport = tx >= viewportX && tx <= viewportX + viewportWidth
+                                && ty >= viewportY && ty <= viewportY + viewportHeight;
+
+                  if (!lookingForNew && _joystickTouchDevice == touchDevice && _joystickFingerId == f.id)
+                  {
+                      trackedFingerFound = true;
+                      double dx   = tx - dpadX;
+                      double dy   = ty - dpadY;
+                      double dist = Math.Sqrt(dx * dx + dy * dy);
+                      if (dist > dpadDead)
+                      {
+                          double scale = Math.Min(dist, joystickMaxRadius) / joystickMaxRadius;
+                          joystickX = dx / dist * scale;
+                          joystickY = dy / dist * scale;
+                      }
+                      joystickTouched = true;
+                  }
+
+                  if (!inViewport) continue;
+
+                  if (lookingForNew && !joystickTouched && tx < leftZoneX && ty > bottomZoneY)
+                  {
+                      _joystickTouchDevice = touchDevice;
+                      _joystickFingerId    = f.id;
+                      lookingForNew        = false;
+                      trackedFingerFound   = true;
+                      double dx   = tx - dpadX;
+                      double dy   = ty - dpadY;
+                      double dist = Math.Sqrt(dx * dx + dy * dy);
+                      if (dist > dpadDead)
+                      {
+                          double scale = Math.Min(dist, joystickMaxRadius) / joystickMaxRadius;
+                          joystickX = dx / dist * scale;
+                          joystickY = dy / dist * scale;
+                      }
+                      joystickTouched = true;
+                  }
+
+                  if (tx > jumpRegionStart && ty > bottomZoneY)
+                      touchJump = true;
+                  if (tx > viewportX + viewportWidth - pauseButtonSize && ty < viewportY + pauseButtonSize)
+                      touchPause = true;
+              }
           }
-        }
-        double dpadX = viewportX + viewportWidth * AndroidTouchDpadXFactor;
-        double dpadY = viewportY + viewportHeight * AndroidTouchDpadYFactor;
-        double dpadDead = viewportWidth * AndroidTouchDpadDeadFactor;
-        double leftZoneX = viewportX + viewportWidth * AndroidTouchLeftZoneXFactor;
-        double bottomZoneY = viewportY + viewportHeight * AndroidTouchBottomZoneYFactor;
-        double jumpRegionStart = viewportX + viewportWidth * AndroidTouchJumpRegionStartFactor;
-        double pauseButtonSize = Math.Min(viewportWidth, viewportHeight) * AndroidTouchPauseSizeFactor;
-        bool touchUp = false;
-        bool touchDown = false;
-        bool touchLeft = false;
-        bool touchRight = false;
-        bool touchJump = false;
-        bool touchPause = false;
-        int numTouchDevices = SDL.SDL_GetNumTouchDevices();
-        for (int deviceIndex = 0; deviceIndex < numTouchDevices; ++deviceIndex)
-        {
-          long touchDevice = SDL.SDL_GetTouchDevice(deviceIndex);
-          int numFingers = SDL.SDL_GetNumTouchFingers(touchDevice);
-          for (int fingerIndex = 0; fingerIndex < numFingers; ++fingerIndex)
+
+          if (!lookingForNew && !trackedFingerFound)
+              _joystickTouchDevice = -1;
+
+          GamePadInputState gamePadState = gamePadStates[0];
+          if (joystickTouched)
           {
-            IntPtr touchFingerPtr = SDL.SDL_GetTouchFinger(touchDevice, fingerIndex);
-            if (touchFingerPtr == IntPtr.Zero)
-              continue;
-            SDL.SDL_Finger structure = Marshal.PtrToStructure<SDL.SDL_Finger>(touchFingerPtr);
-            double tx = structure.x * windowWidth;
-            double ty = structure.y * windowHeight;
-            if (tx >= viewportX && tx <= viewportX + viewportWidth && ty >= viewportY && ty <= viewportY + viewportHeight && tx < leftZoneX && ty > bottomZoneY)
-            {
-              double dx = tx - dpadX;
-              double dy = ty - dpadY;
-              if (dx < -dpadDead)
-                touchLeft = true;
-              if (dx > dpadDead)
-                touchRight = true;
-              if (dy < -dpadDead)
-                touchUp = true;
-              if (dy > dpadDead)
-                touchDown = true;
-            }
-            if (tx >= viewportX && tx <= viewportX + viewportWidth && ty >= viewportY && ty <= viewportY + viewportHeight && tx > jumpRegionStart && ty > bottomZoneY)
-              touchJump = true;
-            if (tx > viewportX + viewportWidth - pauseButtonSize && ty < viewportY + pauseButtonSize)
-              touchPause = true;
+              gamePadState.LeftAxis = new Vector2(joystickX, joystickY);
+              const double t = 0.3;
+              Vector2i pov = gamePadState.POV;
+              pov.X = joystickX > t ? 1 : joystickX < -t ? -1 : 0;
+              pov.Y = joystickY > t ? 1 : joystickY < -t ? -1 : 0;
+              gamePadState.POV = pov;
           }
-        }
-        GamePadInputState gamePadState = gamePadStates[0];
-        Vector2i pov = gamePadState.POV;
-        if (touchLeft && !touchRight)
-          pov.X = -1;
-        else if (touchRight && !touchLeft)
-          pov.X = 1;
-        if (touchUp && !touchDown)
-          pov.Y = -1;
-        else if (touchDown && !touchUp)
-          pov.Y = 1;
-        gamePadState.POV = pov;
-        gamePadState.South = gamePadState.South || touchJump;
-        gamePadState.Start = gamePadState.Start || touchPause;
-        gamePadStates[0] = gamePadState;
+          gamePadState.South = gamePadState.South || touchJump;
+          gamePadState.Start = gamePadState.Start || touchPause;
+          gamePadStates[0] = gamePadState;
       }
 #endif
 
