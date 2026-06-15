@@ -88,7 +88,19 @@ namespace SonicOrca.SDL2
         this._glId = GL.GenTexture();
         GL.BindTexture(TextureTarget.Texture2D, this._glId);
 #if __ANDROID__
-        GL.TexImage2D<byte>(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, width, height, 0, channels == 3 ? PixelFormat.Rgb : PixelFormat.Rgba, PixelType.UnsignedByte, argb);
+        if (channels == 3)
+        {
+            byte[] rgba = new byte[width * height * 4];
+            for (int i = 0; i < width * height; i++)
+            {
+                rgba[i * 4 + 0] = argb[i * 3 + 0];
+                rgba[i * 4 + 1] = argb[i * 3 + 1];
+                rgba[i * 4 + 2] = argb[i * 3 + 2];
+                rgba[i * 4 + 3] = 255;
+            }
+            argb = rgba;
+        }
+        GL.TexImage2D<byte>(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, width, height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, argb);
 #else
         if (toCompress)
           GL.TexImage2D<byte>(TextureTarget.Texture2D, 0, PixelInternalFormat.CompressedRgbaS3tcDxt1Ext, width, height, 0, channels == 3 ? PixelFormat.Rgb : PixelFormat.Rgba, PixelType.UnsignedByte, argb);
