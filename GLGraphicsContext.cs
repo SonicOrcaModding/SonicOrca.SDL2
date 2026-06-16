@@ -105,7 +105,7 @@ namespace SonicOrca.SDL2
       {
         get
         {
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
           return SonicOrca.Graphics.PolygonMode.Fill;
 #else
           int data;
@@ -115,7 +115,7 @@ namespace SonicOrca.SDL2
         }
         set
         {
-#if !__ANDROID__
+#if !__ANDROID__ && !__IOS__
           GL.PolygonMode(MaterialFace.FrontAndBack, (OpenTK.Graphics.OpenGL.PolygonMode) (6912 + value));
 #endif
         }

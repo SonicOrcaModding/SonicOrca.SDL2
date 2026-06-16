@@ -87,7 +87,7 @@ namespace SonicOrca.SDL2
         this.Height = height;
         this._glId = GL.GenTexture();
         GL.BindTexture(TextureTarget.Texture2D, this._glId);
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
         if (channels == 3)
         {
             byte[] rgba = new byte[width * height * 4];
@@ -129,7 +129,7 @@ namespace SonicOrca.SDL2
       public byte[] GetArgbData()
       {
         byte[] pixels = new byte[this.Width * this.Height * 4];
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
         GL.ReadPixels(0, 0, this.Width, this.Height, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);
 #else
         GL.GetTexImage<byte>(TextureTarget.Texture2D, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);

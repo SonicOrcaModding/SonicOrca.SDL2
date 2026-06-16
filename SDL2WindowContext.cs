@@ -40,6 +40,9 @@ namespace SonicOrca.SDL2
 #if __ANDROID__
       public static volatile bool AndroidSuspended;
 #endif
+#if __IOS__
+      public static volatile bool iOSSuspended;
+#endif
 
       public IntPtr WindowHandle => this._windowHandle;
 
@@ -73,7 +76,7 @@ namespace SonicOrca.SDL2
         get => this._mode;
         set
         {
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
           if (value == VideoMode.Windowed)
             value = VideoMode.WindowedBorderless;
 #endif
@@ -93,7 +96,7 @@ namespace SonicOrca.SDL2
           SDL.SDL_SetWindowFullscreen(this._windowHandle, flags);
           if (value != VideoMode.Windowed)
             return;
-#if !__ANDROID__
+#if !__ANDROID__ && !__IOS__
           this.UpdateWindowSize(new Vector2i(1920, 1080));
 #endif
         }
@@ -157,6 +160,48 @@ namespace SonicOrca.SDL2
       {
         this._platform = platform;
         Trace.WriteLine("Initialising SDL2 video");
+#if __IOS__
+        SDL.SDL_SetHint(SDL.SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
+        Exception sdlInitEx = null;
+        CoreFoundation.DispatchQueue.MainQueue.DispatchSync(() =>
+        {
+          try
+          {
+            if (SDL.SDL_InitSubSystem(32U) != 0)
+              throw SDL2Exception.FromError("Unable to initialise a video driver.");
+            SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_CONTEXT_PROFILE_MASK, (int)SDL.SDL_GLprofile.SDL_GL_CONTEXT_PROFILE_ES);
+            SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+            SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_CONTEXT_MINOR_VERSION, 0);
+            SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_MULTISAMPLESAMPLES, 0);
+            SDL.SDL_DisplayMode mode;
+            SDL.SDL_GetDesktopDisplayMode(0, out mode);
+            int w = mode.w > 0 ? mode.w : 1920;
+            int h = mode.h > 0 ? mode.h : 1080;
+            Trace.WriteLine("Creating window");
+            this._windowHandle = SDL.SDL_CreateWindow(
+              this._windowTitle, SDL.SDL_WINDOWPOS_CENTERED, SDL.SDL_WINDOWPOS_CENTERED,
+              w, h, SDL.SDL_WindowFlags.SDL_WINDOW_OPENGL);
+            if (this._windowHandle == IntPtr.Zero)
+              throw SDL2Exception.FromError("Unable to create window.");
+            this._clientSize = new Vector2i(w, h);
+            Trace.WriteLine("Creating OpenGL context");
+            this._glContext = SDL.SDL_GL_CreateContext(this._windowHandle);
+            if (this._glContext == IntPtr.Zero)
+              throw SDL2Exception.FromError("Unable to create OpenGL context.");
+            SDL.SDL_GL_SetSwapInterval(1);
+            SDL.SDL_ShowWindow(this._windowHandle);
+            SDL.SDL_SetWindowFullscreen(this._windowHandle, (uint)SDL.SDL_WindowFlags.SDL_WINDOW_FULLSCREEN_DESKTOP);
+            SDL.SDL_StopTextInput();
+            SDL.SDL_GL_MakeCurrent(this._windowHandle, IntPtr.Zero);
+          }
+          catch (Exception ex) { sdlInitEx = ex; }
+        });
+        if (sdlInitEx != null) throw sdlInitEx;
+        SDL.SDL_GL_MakeCurrent(this._windowHandle, this._glContext);
+        this.SetOpenTKOpenGLHandle(this._glContext, this._windowHandle);
+        this.ContextThread = Thread.CurrentThread;
+        this._glGraphicsContext = new GLGraphicsContext(this);
+#else
         if (SDL.SDL_InitSubSystem(32U /*0x20*/) != 0)
           throw SDL2Exception.FromError("Unable to initialise a video driver.");
 #if __ANDROID__
@@ -204,6 +249,7 @@ namespace SonicOrca.SDL2
         this.ContextThread = Thread.CurrentThread;
         this._glGraphicsContext = new GLGraphicsContext(this);
         this.ShowWindowWithBlackBackground();
+#endif
       }
 
       private void SetIconToAssemblyResource()
@@ -253,6 +299,21 @@ namespace SonicOrca.SDL2
           audio?.PauseDevice();
 
           while (AndroidSuspended && !this.Finished)
+            Thread.Sleep(100);
+
+          if (this.Finished)
+            return;
+
+          audio?.ResumeDevice();
+        }
+#endif
+#if __IOS__
+        if (iOSSuspended)
+        {
+          var audio = this._platform.Audio as SDL2AudioContext;
+          audio?.PauseDevice();
+
+          while (iOSSuspended && !this.Finished)
             Thread.Sleep(100);
 
           if (this.Finished)
@@ -311,7 +372,7 @@ namespace SonicOrca.SDL2
 
       public override void BeginRender()
       {
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
         SDL.SDL_GL_MakeCurrent(this._windowHandle, this._glContext);
 #endif
         GL.ClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -321,7 +382,7 @@ namespace SonicOrca.SDL2
 
       public override void EndRender()
       {
-#if !__ANDROID__
+#if !__ANDROID__ && !__IOS__
         if (!SonicOrcaGameContext.IsMaxPerformance)
           GL.Finish();
 #endif
@@ -335,7 +396,7 @@ namespace SonicOrca.SDL2
         GL.ClearColor(0.0f, 0.0f, 0.0f, 1f);
         SDL.SDL_GL_SwapWindow(this._windowHandle);
         SDL.SDL_ShowWindow(this._windowHandle);
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
         SDL.SDL_SetWindowFullscreen(this._windowHandle, (uint)SDL.SDL_WindowFlags.SDL_WINDOW_FULLSCREEN_DESKTOP);
         SDL.SDL_StopTextInput();
 #endif
@@ -345,7 +406,7 @@ namespace SonicOrca.SDL2
 
       private void UpdateWindowSize(Vector2i size)
       {
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
         this._clientSize = size;
         if (this._aspectRatio.X > 0 && this._aspectRatio.Y > 0)
         {

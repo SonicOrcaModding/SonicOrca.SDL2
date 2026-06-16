@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net10.0;net10.0-android</TargetFrameworks>
+    <TargetFrameworks>net10.0;net10.0-android;net7.0-ios</TargetFrameworks>
+    <TargetFrameworks Condition="'$(BuildingForiOS)' == 'true'">net7.0-ios</TargetFrameworks>
     <RootNamespace>SonicOrca.SDL2</RootNamespace>
     <AssemblyName>SonicOrca.SDL2</AssemblyName>
-    <LangVersion>12</LangVersion>
+    <LangVersion>preview</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
@@ -18,7 +19,13 @@
     <OutputPath>bin\x86\Release\</OutputPath>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="OpenTK" Version="3.3.3" />
+    <PackageReference Include="OpenTK" Version="3.3.3" Condition="'$(TargetFramework)' != 'net7.0-ios'" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(TargetFramework)' == 'net7.0-ios'">
+    <Reference Include="OpenTK">
+      <HintPath>..\..\S2HD\Platforms\iOS\libs\OpenTK.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SonicOrca.Common\SonicOrca.Common.csproj" />

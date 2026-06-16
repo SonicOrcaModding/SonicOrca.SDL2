@@ -51,6 +51,9 @@ namespace SonicOrca.SDL2
                 yield return "libSDL2.so";
                 yield return "SDL2";
 #endif
+#if __IOS__
+                yield return "__Internal";
+#endif
                 yield return "libSDL2-2.0.so.0";
                 yield return "libSDL2-2.0.so";
                 yield return "libSDL2.so";

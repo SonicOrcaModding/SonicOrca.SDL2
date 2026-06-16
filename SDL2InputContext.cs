@@ -24,7 +24,7 @@ namespace SonicOrca.SDL2
       private readonly List<IntPtr> _gameControllers = new List<IntPtr>();
       private readonly List<IntPtr> _haptic = new List<IntPtr>();
       private SDL.SDL_Event[] events = new SDL.SDL_Event[512 /*0x0200*/];
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
       private const double AndroidTouchDpadXFactor = 48.0 / 320.0;
       private const double AndroidTouchDpadYFactor = 192.0 / 240.0;
       private const double AndroidTouchDpadDeadFactor = 12.0 / 320.0;
@@ -97,7 +97,7 @@ namespace SonicOrca.SDL2
       {
         int num1 = 0;
         this.TextInput = (string) null;
-#if !__ANDROID__
+#if !__ANDROID__ && !__IOS__
         SDL.SDL_StartTextInput();
 #else
         if (SDL.SDL_IsTextInputActive() != SDL.SDL_bool.SDL_FALSE)
@@ -177,7 +177,7 @@ namespace SonicOrca.SDL2
           gamePadInputState.RightTrigger = this.GetGameControllerAxis(gameController, SDL.SDL_GameControllerAxis.SDL_CONTROLLER_AXIS_TRIGGERRIGHT, minTolerance, maxTolerance);
           array[index] = gamePadInputState;
         }
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
         this.ApplyAndroidTouchControls(array);
 #endif
         this.CurrentState = new InputState(mouseState2, keyboardState2, array);
@@ -193,7 +193,7 @@ namespace SonicOrca.SDL2
         return SDL.SDL_GameControllerGetButton(controller, button) > (byte) 0;
       }
 
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
       private void ApplyAndroidTouchControls(GamePadInputState[] gamePadStates)
       {
           if (gamePadStates == null || gamePadStates.Length == 0)

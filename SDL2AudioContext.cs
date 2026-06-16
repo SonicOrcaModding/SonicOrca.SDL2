@@ -10,6 +10,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+#if __IOS__
+using ObjCRuntime;
+#endif
 
 namespace SonicOrca.SDL2
 {
@@ -22,6 +25,9 @@ namespace SonicOrca.SDL2
       private SDL.SDL_AudioSpec _outputAudioSpec;
       private byte[] _callbackBuffer;
       private ISampleProvider[] _providerCache = Array.Empty<ISampleProvider>();
+#if __IOS__
+      private GCHandle _selfHandle;
+#endif
 
       public SDL2AudioContext(SDL2Platform platform)
       {
@@ -29,6 +35,18 @@ namespace SonicOrca.SDL2
         Trace.WriteLine("Initialising SDL2 audio");
         if (SDL.SDL_InitSubSystem(16U /*0x10*/) != 0)
           throw SDL2Exception.FromError("Unable to initialise an audio driver.");
+#if __IOS__
+        this._selfHandle = GCHandle.Alloc(this);
+        SDL.SDL_AudioSpec desired = new SDL.SDL_AudioSpec()
+        {
+          channels = 2,
+          format = 32784,
+          freq = 44100,
+          samples = 2048 /*0x0800*/,
+          callback = new SDL.SDL_AudioCallback(ReadDataCallbackStatic),
+          userdata = GCHandle.ToIntPtr(this._selfHandle)
+        };
+#else
         SDL.SDL_AudioSpec desired = new SDL.SDL_AudioSpec()
         {
           channels = 2,
@@ -37,6 +55,7 @@ namespace SonicOrca.SDL2
           samples = 2048 /*0x0800*/,
           callback = new SDL.SDL_AudioCallback(this.ReadDataCallback)
         };
+#endif
         this._outputDevice = SDL.SDL_OpenAudioDevice((string) null, 0, ref desired, out this._outputAudioSpec, 0);
         if (this._outputDevice == 0U)
           throw SDL2Exception.FromError("Unable to create output buffer.");
@@ -52,7 +71,20 @@ namespace SonicOrca.SDL2
         SDL.SDL_CloseAudioDevice(this._outputDevice);
         Trace.WriteLine("Quitting SDL2 video");
         SDL.SDL_QuitSubSystem(16U /*0x10*/);
+#if __IOS__
+        if (this._selfHandle.IsAllocated)
+          this._selfHandle.Free();
+#endif
       }
+
+#if __IOS__
+      [MonoPInvokeCallback(typeof(SDL.SDL_AudioCallback))]
+      private static void ReadDataCallbackStatic(IntPtr userdata, IntPtr stream, int length)
+      {
+        var context = (SDL2AudioContext) GCHandle.FromIntPtr(userdata).Target;
+        context?.ReadDataCallback(userdata, stream, length);
+      }
+#endif
 
       public override void RegisterSampleProvider(ISampleProvider sampleProvider)
       {

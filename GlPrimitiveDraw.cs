@@ -11,7 +11,7 @@ namespace SonicOrca.SDL2
         {
             if (count <= 0)
                 return;
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
             if (engineType == SonicOrca.Graphics.PrimitiveType.Quads)
             {
                 if (count % 4 != 0)
@@ -25,7 +25,7 @@ namespace SonicOrca.SDL2
             GL.DrawArrays(ToGlPrimitive(engineType), first, count);
         }
 
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
         private const int MaxPooledQuads = 1024;
         private static readonly ushort[] _pooledIndices = new ushort[MaxPooledQuads * 6];
         private static readonly GCHandle _pooledHandle;

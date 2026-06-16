@@ -52,7 +52,7 @@ namespace SonicOrca.SDL2
         for (int index = 0; index < numTextures; ++index)
         {
           GLTexture glTexture = this._textures[index] = (GLTexture) context.CreateTexture(width, height);
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
           GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, (FramebufferAttachment)(36064 + index), TextureTarget.Texture2D, glTexture.Id, 0);
 #else
           GL.FramebufferTexture(FramebufferTarget.Framebuffer, (FramebufferAttachment) (36064 + index), glTexture.Id, 0);

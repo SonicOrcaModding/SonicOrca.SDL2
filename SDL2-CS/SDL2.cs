@@ -43,7 +43,11 @@ namespace SDL2
 		/// <summary>
 		/// Used by DllImport to load the native library.
 		/// </summary>
+#if __IOS__
+		private const string nativeLibName = "__Internal";
+#else
 		private const string nativeLibName = "SDL2.dll";
+#endif
 
 		#endregion
 

@@ -16,7 +16,7 @@ namespace SonicOrca.SDL2
 
     internal class GLShader : IShader, IDisposable
     {
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
       private static string AdaptSourceForOpenGlEs(string source)
       {
         if (string.IsNullOrEmpty(source))
@@ -106,12 +106,12 @@ namespace SonicOrca.SDL2
 
       public GLShader(SonicOrca.Graphics.ShaderType type, string sourceCode)
       {
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
         if (type != SonicOrca.Graphics.ShaderType.Fragment && type != SonicOrca.Graphics.ShaderType.Vertex)
           throw new SDL2Exception("Only vertex and fragment shaders are supported on OpenGL ES.");
 #endif
         this._type = GLShader.ShaderTypeConversionTable[(int) type];
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
         sourceCode = AdaptSourceForOpenGlEs(sourceCode);
 #endif
         this._sourceCode = sourceCode;
