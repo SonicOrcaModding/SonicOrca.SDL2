@@ -17,6 +17,13 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
+#if __IOS__
+using UIKit;
+using Foundation;
+using ObjCRuntime;
+using CoreAnimation;
+using CoreGraphics;
+#endif
 
 namespace SonicOrca.SDL2
 {
@@ -42,6 +49,9 @@ namespace SonicOrca.SDL2
 #endif
 #if __IOS__
       public static volatile bool iOSSuspended;
+      internal static int iOSWindowFramebuffer;
+      private UIImageView _iosDisplayView;
+      private byte[] _iosPixels;
 #endif
 
       public IntPtr WindowHandle => this._windowHandle;
@@ -162,6 +172,7 @@ namespace SonicOrca.SDL2
         Trace.WriteLine("Initialising SDL2 video");
 #if __IOS__
         SDL.SDL_SetHint(SDL.SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
+        SDL.SDL_SetHint(SDL.SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
         Exception sdlInitEx = null;
         CoreFoundation.DispatchQueue.MainQueue.DispatchSync(() =>
         {
@@ -199,8 +210,28 @@ namespace SonicOrca.SDL2
         if (sdlInitEx != null) throw sdlInitEx;
         SDL.SDL_GL_MakeCurrent(this._windowHandle, this._glContext);
         this.SetOpenTKOpenGLHandle(this._glContext, this._windowHandle);
+        {
+          int pw = 1920;
+          int ph = 1080;
+          int fbo, tex, depth;
+          GL.GenFramebuffers(1, out fbo);
+          GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
+          GL.GenTextures(1, out tex);
+          GL.BindTexture(TextureTarget.Texture2D, tex);
+          GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, pw, ph, 0, PixelFormat.Rgba, PixelType.UnsignedByte, IntPtr.Zero);
+          GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int) TextureMinFilter.Linear);
+          GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int) TextureMagFilter.Linear);
+          GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, tex, 0);
+          GL.GenRenderbuffers(1, out depth);
+          GL.BindRenderbuffer(RenderbufferTarget.Renderbuffer, depth);
+          GL.RenderbufferStorage(RenderbufferTarget.Renderbuffer, RenderbufferStorage.Depth24Stencil8, pw, ph);
+          GL.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthStencilAttachment, RenderbufferTarget.Renderbuffer, depth);
+          iOSWindowFramebuffer = fbo;
+          this._clientSize = new Vector2i(pw, ph);
+        }
         this.ContextThread = Thread.CurrentThread;
         this._glGraphicsContext = new GLGraphicsContext(this);
+        this.InspectAndFixIOSWindow();
 #else
         if (SDL.SDL_InitSubSystem(32U /*0x20*/) != 0)
           throw SDL2Exception.FromError("Unable to initialise a video driver.");
@@ -251,6 +282,87 @@ namespace SonicOrca.SDL2
         this.ShowWindowWithBlackBackground();
 #endif
       }
+
+#if __IOS__
+      private void InspectAndFixIOSWindow()
+      {
+        var info = new SDL.SDL_SysWMinfo();
+        SDL.SDL_GetVersion(out info.version);
+        if (SDL.SDL_GetWindowWMInfo(this._windowHandle, ref info) == SDL.SDL_bool.SDL_FALSE)
+          return;
+        IntPtr uiwindowPtr = info.info.uikit.window;
+        CoreFoundation.DispatchQueue.MainQueue.DispatchSync(() =>
+        {
+          var win = Runtime.GetNSObject<UIWindow>(uiwindowPtr);
+          if (win == null) return;
+          win.Hidden = false;
+          win.MakeKeyAndVisible();
+          var glView = win.RootViewController?.View;
+          if (glView != null)
+          {
+            var iv = new UIImageView(glView.Bounds);
+            iv.AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight;
+            iv.ContentMode = UIViewContentMode.ScaleToFill;
+            iv.UserInteractionEnabled = false;
+            iv.Transform = CGAffineTransform.MakeScale(1f, -1f);
+            glView.AddSubview(iv);
+            this._iosDisplayView = iv;
+          }
+        });
+      }
+
+      private readonly object _iosDisplayLock = new object();
+      private UIImage _iosPendingImage;
+      private bool _iosDisplayQueued;
+
+      private void PresentIOSReadback(int w, int h)
+      {
+        int need = w * h * 4;
+        if (this._iosPixels == null || this._iosPixels.Length < need)
+          this._iosPixels = new byte[need];
+        GL.BindFramebuffer(FramebufferTarget.Framebuffer, (uint) iOSWindowFramebuffer);
+        GL.ReadPixels(0, 0, w, h, PixelFormat.Rgba, PixelType.UnsignedByte, this._iosPixels);
+        UIImage img;
+        using (var cs = CGColorSpace.CreateDeviceRGB())
+        using (var ctx = new CGBitmapContext(this._iosPixels, w, h, 8, w * 4, cs, CGImageAlphaInfo.PremultipliedLast))
+        using (var cg = ctx.ToImage())
+          img = UIImage.FromImage(cg);
+        bool queue = false;
+        lock (this._iosDisplayLock)
+        {
+          this._iosPendingImage?.Dispose();
+          this._iosPendingImage = img;
+          if (!this._iosDisplayQueued)
+          {
+            this._iosDisplayQueued = true;
+            queue = true;
+          }
+        }
+        if (!queue)
+          return;
+        CoreFoundation.DispatchQueue.MainQueue.DispatchAsync(() =>
+        {
+          UIImage toShow;
+          lock (this._iosDisplayLock)
+          {
+            toShow = this._iosPendingImage;
+            this._iosPendingImage = null;
+            this._iosDisplayQueued = false;
+          }
+          var iv = this._iosDisplayView;
+          if (iv != null && toShow != null)
+          {
+            var old = iv.Image;
+            iv.Image = toShow;
+            old?.Dispose();
+          }
+          else
+          {
+            toShow?.Dispose();
+          }
+        });
+      }
+#endif
 
       private void SetIconToAssemblyResource()
       {
@@ -336,8 +448,12 @@ namespace SonicOrca.SDL2
               switch (sdlEvent.window.windowEvent)
               {
                 case SDL.SDL_WindowEventID.SDL_WINDOWEVENT_SIZE_CHANGED:
+#if __IOS__
+                  continue;
+#else
                   this.UpdateWindowSize(new Vector2i(sdlEvent.window.data1, sdlEvent.window.data2));
                   continue;
+#endif
                 case SDL.SDL_WindowEventID.SDL_WINDOWEVENT_CLOSE:
                   this.Finished = true;
                   continue;
@@ -386,7 +502,11 @@ namespace SonicOrca.SDL2
         if (!SonicOrcaGameContext.IsMaxPerformance)
           GL.Finish();
 #endif
+#if __IOS__
+        this.PresentIOSReadback(this._clientSize.X, this._clientSize.Y);
+#else
         SDL.SDL_GL_SwapWindow(this._windowHandle);
+#endif
       }
 
       public void Dispatch(Action action) => this._dispatchedActions.Enqueue(action);
@@ -406,8 +526,12 @@ namespace SonicOrca.SDL2
 
       private void UpdateWindowSize(Vector2i size)
       {
-#if __ANDROID__ || __IOS__
+#if __IOS__
+        size = this._clientSize;
+#elif __ANDROID__
         this._clientSize = size;
+#endif
+#if __ANDROID__ || __IOS__
         if (this._aspectRatio.X > 0 && this._aspectRatio.Y > 0)
         {
           double targetAspect = (double) this._aspectRatio.X / (double) this._aspectRatio.Y;

@@ -221,12 +221,16 @@ namespace SonicOrca.SDL2
           this._cachedBackBufferH = y1;
         }
         this.CurrentFramebuffer = (IFramebuffer) this._cachedBackBuffer;
+#if __IOS__
+        GL.BindFramebuffer(FramebufferTarget.Framebuffer, SDL2WindowContext.iOSWindowFramebuffer);
+#else
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+#endif
         Vector2i clientSize2 = this._videoAdapter.ClientSize;
         int x2 = clientSize2.X;
         clientSize2 = this._videoAdapter.ClientSize;
         int y2 = clientSize2.Y;
-#if __ANDROID__
+#if __ANDROID__ || __IOS__
         GL.Viewport(0, 0, x2, y2);
         GL.Clear(ClearBufferMask.ColorBufferBit);
         Vector2i aspectRatio = this._videoAdapter.AspectRatio;

@@ -57,7 +57,11 @@ namespace SonicOrca.SDL2
           switch (value)
           {
             case TextureWrapping.Clamp:
+#if __ANDROID__ || __IOS__
+              textureWrapMode = TextureWrapMode.ClampToEdge;
+#else
               textureWrapMode = TextureWrapMode.Clamp;
+#endif
               break;
             case TextureWrapping.RepeatMirrored:
               textureWrapMode = TextureWrapMode.MirroredRepeat;
@@ -111,8 +115,13 @@ namespace SonicOrca.SDL2
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, 9729);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, 9729);
         this._wrapping = TextureWrapping.Clamp;
+#if __ANDROID__ || __IOS__
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, 33071);
+        GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, 33071);
+#else
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, 10496);
         GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapT, 10496);
+#endif
         this._context.Textures.Add((ITexture) this);
       }
 

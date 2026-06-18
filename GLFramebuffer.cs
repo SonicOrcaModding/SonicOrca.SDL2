@@ -80,7 +80,11 @@ namespace SonicOrca.SDL2
 
       public void Activate()
       {
+#if __IOS__
+        GL.BindFramebuffer(FramebufferTarget.Framebuffer, this._name == 0 ? (uint) SDL2WindowContext.iOSWindowFramebuffer : this._name);
+#else
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, this._name);
+#endif
         GL.Viewport(0, 0, this._width, this._height);
         this._context.CurrentFramebuffer = (IFramebuffer) this;
       }
