@@ -51,7 +51,14 @@ namespace SonicOrca.SDL2
       public static volatile bool iOSSuspended;
       internal static int iOSWindowFramebuffer;
       private UIImageView _iosDisplayView;
-      private byte[] _iosPixels;
+      private readonly int[] _iosPbos = new int[2];
+      private int _iosPboSize;
+      private int _iosPboIndex;
+      private bool _iosPboPrimed;
+      private readonly IntPtr[] _iosFrameBufs = new IntPtr[3];
+      private int _iosFrameBufIndex;
+      private CGColorSpace _iosColorSpace;
+      private int _iosFrameW, _iosFrameH;
 #endif
 
       public IntPtr WindowHandle => this._windowHandle;
@@ -139,6 +146,9 @@ namespace SonicOrca.SDL2
             return;
           this._aspectRatio = value;
           this.UpdateWindowSize();
+#if __IOS__
+          this.UpdateIOSDisplayMode();
+#endif
         }
       }
 
@@ -211,8 +221,8 @@ namespace SonicOrca.SDL2
         SDL.SDL_GL_MakeCurrent(this._windowHandle, this._glContext);
         this.SetOpenTKOpenGLHandle(this._glContext, this._windowHandle);
         {
-          int pw = 1920;
-          int ph = 1080;
+          int pw = 1280;
+          int ph = 720;
           int fbo, tex, depth;
           GL.GenFramebuffers(1, out fbo);
           GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
@@ -228,6 +238,19 @@ namespace SonicOrca.SDL2
           GL.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthStencilAttachment, RenderbufferTarget.Renderbuffer, depth);
           iOSWindowFramebuffer = fbo;
           this._clientSize = new Vector2i(pw, ph);
+          this._iosPboSize = pw * ph * 4;
+          GL.GenBuffers(2, this._iosPbos);
+          for (int i = 0; i < 2; i++)
+          {
+            GL.BindBuffer(BufferTarget.PixelPackBuffer, this._iosPbos[i]);
+            GL.BufferData(BufferTarget.PixelPackBuffer, (IntPtr) this._iosPboSize, IntPtr.Zero, BufferUsageHint.StreamRead);
+          }
+          GL.BindBuffer(BufferTarget.PixelPackBuffer, 0);
+          this._iosFrameW = pw;
+          this._iosFrameH = ph;
+          for (int i = 0; i < this._iosFrameBufs.Length; i++)
+            this._iosFrameBufs[i] = Marshal.AllocHGlobal(this._iosPboSize);
+          this._iosColorSpace = CGColorSpace.CreateDeviceRGB();
         }
         this.ContextThread = Thread.CurrentThread;
         this._glGraphicsContext = new GLGraphicsContext(this);
@@ -315,18 +338,57 @@ namespace SonicOrca.SDL2
       private UIImage _iosPendingImage;
       private bool _iosDisplayQueued;
 
-      private void PresentIOSReadback(int w, int h)
+      private unsafe void PresentIOSReadback(int w, int h)
       {
-        int need = w * h * 4;
-        if (this._iosPixels == null || this._iosPixels.Length < need)
-          this._iosPixels = new byte[need];
+        int writeIdx = this._iosPboIndex;
+        int readIdx = 1 - writeIdx;
+
         GL.BindFramebuffer(FramebufferTarget.Framebuffer, (uint) iOSWindowFramebuffer);
-        GL.ReadPixels(0, 0, w, h, PixelFormat.Rgba, PixelType.UnsignedByte, this._iosPixels);
-        UIImage img;
-        using (var cs = CGColorSpace.CreateDeviceRGB())
-        using (var ctx = new CGBitmapContext(this._iosPixels, w, h, 8, w * 4, cs, CGImageAlphaInfo.PremultipliedLast))
-        using (var cg = ctx.ToImage())
-          img = UIImage.FromImage(cg);
+        GL.BindBuffer(BufferTarget.PixelPackBuffer, this._iosPbos[writeIdx]);
+        GL.ReadPixels(0, 0, w, h, PixelFormat.Rgba, PixelType.UnsignedByte, IntPtr.Zero);
+
+        UIImage img = null;
+        if (this._iosPboPrimed)
+        {
+          GL.BindBuffer(BufferTarget.PixelPackBuffer, this._iosPbos[readIdx]);
+          IntPtr ptr = GL.MapBufferRange(BufferTarget.PixelPackBuffer, IntPtr.Zero, (IntPtr) this._iosPboSize, BufferAccessMask.MapReadBit);
+          if (ptr != IntPtr.Zero)
+          {
+            int bi = this._iosFrameBufIndex;
+            this._iosFrameBufIndex = (bi + 1) % this._iosFrameBufs.Length;
+            IntPtr dst = this._iosFrameBufs[bi];
+            System.Buffer.MemoryCopy((void*) ptr, (void*) dst, this._iosPboSize, this._iosPboSize);
+            GL.UnmapBuffer(BufferTarget.PixelPackBuffer);
+            using (var pool = new NSAutoreleasePool())
+            using (var provider = new CGDataProvider(dst, this._iosPboSize))
+            using (var cg = new CGImage(w, h, 8, 32, w * 4, this._iosColorSpace, CGImageAlphaInfo.NoneSkipLast, provider, null, false, CGColorRenderingIntent.Default))
+              img = UIImage.FromImage(cg);
+          }
+        }
+        GL.BindBuffer(BufferTarget.PixelPackBuffer, 0);
+        this._iosPboIndex = readIdx;
+        this._iosPboPrimed = true;
+
+        if (img == null)
+          return;
+        this.QueueIOSDisplay(img);
+      }
+
+      private void UpdateIOSDisplayMode()
+      {
+        var iv = this._iosDisplayView;
+        if (iv == null)
+          return;
+        bool widescreen = this._aspectRatio.X == 0 || this._aspectRatio.Y == 0;
+        CoreFoundation.DispatchQueue.MainQueue.DispatchAsync(() =>
+        {
+          iv.ContentMode = widescreen ? UIViewContentMode.ScaleToFill : UIViewContentMode.ScaleAspectFit;
+          iv.BackgroundColor = UIColor.Black;
+        });
+      }
+
+      private void QueueIOSDisplay(UIImage img)
+      {
         bool queue = false;
         lock (this._iosDisplayLock)
         {
@@ -394,6 +456,15 @@ namespace SonicOrca.SDL2
 
       public override void Dispose()
       {
+#if __IOS__
+        for (int i = 0; i < this._iosFrameBufs.Length; i++)
+        {
+          if (this._iosFrameBufs[i] != IntPtr.Zero)
+            Marshal.FreeHGlobal(this._iosFrameBufs[i]);
+          this._iosFrameBufs[i] = IntPtr.Zero;
+        }
+        this._iosColorSpace?.Dispose();
+#endif
         Trace.WriteLine("Deleting OpenGL context");
         SDL.SDL_GL_DeleteContext(this._glContext);
         Trace.WriteLine("Closing window");

@@ -1,6 +1,5 @@
 using SonicOrca.Graphics;
 using System;
-using System.Runtime.InteropServices;
 using OpenTK.Graphics.OpenGL;
 
 namespace SonicOrca.SDL2
@@ -26,9 +25,11 @@ namespace SonicOrca.SDL2
         }
 
 #if __ANDROID__ || __IOS__
-        private const int MaxPooledQuads = 1024;
+        private const int MaxPooledQuads = 16384;
         private static readonly ushort[] _pooledIndices = new ushort[MaxPooledQuads * 6];
-        private static readonly GCHandle _pooledHandle;
+        private static int _staticEbo = -1;
+        private static int _dynamicEbo = -1;
+        private static ushort[] _scratch;
 
         static GlPrimitiveDraw()
         {
@@ -43,7 +44,6 @@ namespace SonicOrca.SDL2
                 _pooledIndices[w + 4] = (ushort)(b + 2);
                 _pooledIndices[w + 5] = (ushort)(b + 3);
             }
-            _pooledHandle = GCHandle.Alloc(_pooledIndices, GCHandleType.Pinned);
         }
 
         private static void DrawQuadsAsTriangles(int first, int vertexCount)
@@ -53,31 +53,38 @@ namespace SonicOrca.SDL2
 
             if (first == 0 && nq <= MaxPooledQuads)
             {
-                GL.DrawElements(OpenTK.Graphics.OpenGL.PrimitiveType.Triangles, indexCount, DrawElementsType.UnsignedShort, _pooledHandle.AddrOfPinnedObject());
+                if (_staticEbo == -1)
+                {
+                    _staticEbo = GL.GenBuffer();
+                    GL.BindBuffer(BufferTarget.ElementArrayBuffer, _staticEbo);
+                    GL.BufferData(BufferTarget.ElementArrayBuffer, (IntPtr)(_pooledIndices.Length * sizeof(ushort)), _pooledIndices, BufferUsageHint.StaticDraw);
+                }
+                else
+                {
+                    GL.BindBuffer(BufferTarget.ElementArrayBuffer, _staticEbo);
+                }
+                GL.DrawElements(OpenTK.Graphics.OpenGL.PrimitiveType.Triangles, indexCount, DrawElementsType.UnsignedShort, IntPtr.Zero);
                 return;
             }
 
-            ushort[] indices = new ushort[indexCount];
-            int w = 0;
+            if (_scratch == null || _scratch.Length < indexCount)
+                _scratch = new ushort[indexCount];
+            int p = 0;
             for (int i = 0; i < nq; i++)
             {
                 int b = first + i * 4;
-                indices[w++] = (ushort)b;
-                indices[w++] = (ushort)(b + 1);
-                indices[w++] = (ushort)(b + 2);
-                indices[w++] = (ushort)b;
-                indices[w++] = (ushort)(b + 2);
-                indices[w++] = (ushort)(b + 3);
+                _scratch[p++] = (ushort)b;
+                _scratch[p++] = (ushort)(b + 1);
+                _scratch[p++] = (ushort)(b + 2);
+                _scratch[p++] = (ushort)b;
+                _scratch[p++] = (ushort)(b + 2);
+                _scratch[p++] = (ushort)(b + 3);
             }
-            GCHandle handle = GCHandle.Alloc(indices, GCHandleType.Pinned);
-            try
-            {
-                GL.DrawElements(OpenTK.Graphics.OpenGL.PrimitiveType.Triangles, indexCount, DrawElementsType.UnsignedShort, handle.AddrOfPinnedObject());
-            }
-            finally
-            {
-                handle.Free();
-            }
+            if (_dynamicEbo == -1)
+                _dynamicEbo = GL.GenBuffer();
+            GL.BindBuffer(BufferTarget.ElementArrayBuffer, _dynamicEbo);
+            GL.BufferData(BufferTarget.ElementArrayBuffer, (IntPtr)(indexCount * sizeof(ushort)), _scratch, BufferUsageHint.StreamDraw);
+            GL.DrawElements(OpenTK.Graphics.OpenGL.PrimitiveType.Triangles, indexCount, DrawElementsType.UnsignedShort, IntPtr.Zero);
         }
 #endif
 
