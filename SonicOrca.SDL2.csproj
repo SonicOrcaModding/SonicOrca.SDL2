@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>$(SonicOrcaTargetFramework)</TargetFramework>
     <RootNamespace>SonicOrca.SDL2</RootNamespace>
     <AssemblyName>SonicOrca.SDL2</AssemblyName>
     <LangVersion>12</LangVersion>
@@ -17,12 +17,20 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
     <OutputPath>bin\x86\Release\</OutputPath>
   </PropertyGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(Platform)' != 'Switch'">
     <PackageReference Include="OpenTK" Version="3.3.3" />
   </ItemGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(Platform)' == 'Switch'">
+    <Reference Include="OpenTK" HintPath="$(OpenTKSwitchAssembly)" Private="true" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Platform)' != 'Switch'">
     <ProjectReference Include="..\SonicOrca.Common\SonicOrca.Common.csproj" />
     <ProjectReference Include="..\SonicOrca.Resources\SonicOrca.Resources.csproj" />
     <ProjectReference Include="..\SonicOrca\SonicOrca.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Platform)' == 'Switch'">
+    <Reference Include="SonicOrca.Common" HintPath="..\SonicOrca.Common\bin\Switch\$(Configuration)\SonicOrca.Common.dll" />
+    <Reference Include="SonicOrca.Resources" HintPath="..\SonicOrca.Resources\bin\Switch\$(Configuration)\SonicOrca.Resources.dll" />
+    <Reference Include="SonicOrca" HintPath="..\SonicOrca\bin\Switch\$(Configuration)\SonicOrca.dll" />
   </ItemGroup>
 </Project>

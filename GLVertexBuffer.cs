@@ -141,6 +141,14 @@ namespace SonicOrca.SDL2
         if (this._noRender)
           return;
         GL.BindVertexArray(this._glId);
+#if MONO_NX
+        if (type == SonicOrca.Graphics.PrimitiveType.Quads)
+        {
+          for (int vertex = 0; vertex + 3 < this._numPoints; vertex += 4)
+            GL.DrawArrays(OpenTK.Graphics.OpenGL.PrimitiveType.TriangleFan, vertex, 4);
+          return;
+        }
+#endif
         GL.DrawArrays(GLVertexBuffer.BeginModesForPrimitiveTypes[(int) type], 0, this._numPoints);
       }
 
@@ -149,6 +157,17 @@ namespace SonicOrca.SDL2
         if (this._noRender)
           return;
         GL.BindVertexArray(this._glId);
+#if MONO_NX
+        if (type == SonicOrca.Graphics.PrimitiveType.Quads)
+        {
+          for (int quad = 0; quad + 3 < count; quad += 4)
+          {
+            int vertex = index + quad;
+            GL.DrawArrays(OpenTK.Graphics.OpenGL.PrimitiveType.TriangleFan, vertex, 4);
+          }
+          return;
+        }
+#endif
         GL.DrawArrays(GLVertexBuffer.BeginModesForPrimitiveTypes[(int) type], index, count);
       }
     }

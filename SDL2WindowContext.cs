@@ -150,16 +150,31 @@ namespace SonicOrca.SDL2
         Trace.WriteLine("Initialising SDL2 video");
         if (SDL.SDL_InitSubSystem(32U /*0x20*/) != 0)
           throw SDL2Exception.FromError("Unable to initialise a video driver.");
+#if MONO_NX
+        SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_CONTEXT_PROFILE_MASK, (int) SDL.SDL_GLprofile.SDL_GL_CONTEXT_PROFILE_ES);
+        SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+        SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#else
         SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_MULTISAMPLESAMPLES, 1);
+#endif
         SDL.SDL_GL_SetSwapInterval(1);
         SDL.SDL_DisplayMode mode;
         SDL.SDL_GetDesktopDisplayMode(0, out mode);
+#if MONO_NX
+        int num1 = 1920;
+        int num2 = 1080;
+#else
         int num1 = 1920;
         int num2;
         for (num2 = 1080; num1 > mode.w || num2 > mode.h; num2 -= 270)
           num1 -= 480;
+#endif
         Trace.WriteLine("Creating window");
+#if MONO_NX
+        this._windowHandle = SDL.SDL_CreateWindow(this._windowTitle, 0, 0, num1, num2, 0);
+#else
         this._windowHandle = SDL.SDL_CreateWindow(this._windowTitle, 805240832, 805240832, num1, num2, SDL.SDL_WindowFlags.SDL_WINDOW_OPENGL | SDL.SDL_WindowFlags.SDL_WINDOW_HIDDEN | SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE);
+#endif
         if (this._windowHandle == IntPtr.Zero)
           throw SDL2Exception.FromError("Unable to create window.");
         this._clientSize = new Vector2i(num1, num2);
@@ -186,11 +201,13 @@ namespace SonicOrca.SDL2
 
       private void SetOpenTKOpenGLHandle(IntPtr glHandle, IntPtr sdlWindow)
       {
+#if !MONO_NX
         Toolkit.Init();
         if (OperatingSystem.IsWindows())
           Utilities.CreateWindowsWindowInfo(this.GetWindowHWND(sdlWindow));
         else
           Utilities.CreateSdl2WindowInfo(sdlWindow);
+#endif
         ContextHandle ch = new ContextHandle(this._glContext);
         ((IGraphicsContextInternal) new OpenTK.Graphics.GraphicsContext(ch, (OpenTK.Graphics.GraphicsContext.GetAddressDelegate) (proc => SDL.SDL_GL_GetProcAddress(proc)), (OpenTK.Graphics.GraphicsContext.GetCurrentContextDelegate) (() => ch))).Implementation.LoadAll();
       }

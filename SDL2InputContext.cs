@@ -21,6 +21,11 @@ namespace SonicOrca.SDL2
     {
       private readonly SDL2Platform _platform;
       private readonly IntPtr _windowHandle;
+#if MONO_NX
+      private const int MaxGameControllers = 1;
+#else
+      private const int MaxGameControllers = 4;
+#endif
       private readonly List<IntPtr> _gameControllers = new List<IntPtr>();
       private readonly List<IntPtr> _haptic = new List<IntPtr>();
       private SDL.SDL_Event[] events = new SDL.SDL_Event[512 /*0x0200*/];
@@ -35,9 +40,11 @@ namespace SonicOrca.SDL2
         Trace.WriteLine("Initialising SDL2 game controller");
         if (SDL.SDL_InitSubSystem(8192U /*0x2000*/) != 0)
           throw SDL2Exception.FromError("Unable to initialise SDL2 game controller subsystem.");
+#if !MONO_NX
         Trace.WriteLine("Initialising SDL2 haptic");
         if (SDL.SDL_InitSubSystem(4096U /*0x1000*/) != 0)
           throw SDL2Exception.FromError("Unable to initialise SDL2 haptic subsystem.");
+#endif
         this.FindGameControllers();
         SDL.SDL_StopTextInput();
       }
@@ -45,8 +52,10 @@ namespace SonicOrca.SDL2
       public void Dispose()
       {
         SDL.SDL_StopTextInput();
+#if !MONO_NX
         Trace.WriteLine("Quitting SDL2 haptic");
         SDL.SDL_QuitSubSystem(4096U /*0x1000*/);
+#endif
         Trace.WriteLine("Quitting SDL2 game controller");
         SDL.SDL_QuitSubSystem(8192U /*0x2000*/);
         Trace.WriteLine("Quitting SDL2 joystick");
@@ -56,20 +65,23 @@ namespace SonicOrca.SDL2
       private void FindGameControllers()
       {
         this._gameControllers.Clear();
-        for (int joystick_index = 0; joystick_index < SDL.SDL_NumJoysticks(); ++joystick_index)
+        this._haptic.Clear();
+        for (int joystick_index = 0; joystick_index < SDL.SDL_NumJoysticks() && this._gameControllers.Count < MaxGameControllers; ++joystick_index)
         {
           if (SDL.SDL_IsGameController(joystick_index) != SDL.SDL_bool.SDL_FALSE)
           {
             IntPtr gamecontroller = SDL.SDL_GameControllerOpen(joystick_index);
             if (gamecontroller != IntPtr.Zero)
             {
-              IntPtr zero = IntPtr.Zero;
-              IntPtr joystick = SDL.SDL_GameControllerGetJoystick(gamecontroller);
               this._gameControllers.Add(gamecontroller);
+#if !MONO_NX
+              IntPtr joystick = SDL.SDL_GameControllerGetJoystick(gamecontroller);
               IntPtr haptic = SDL.SDL_HapticOpenFromJoystick(joystick);
               if (haptic != IntPtr.Zero && SDL.SDL_HapticRumbleInit(haptic) != 0)
                 haptic = IntPtr.Zero;
               this._haptic.Add(haptic);
+#endif
+              Trace.WriteLine(string.Format("    -- Game controller {0}: joystick index {1}", this._gameControllers.Count, joystick_index));
             }
           }
         }
@@ -130,7 +142,7 @@ namespace SonicOrca.SDL2
         mouseState2.Wheel = (double) num1;
         KeyboardState keyboardState2 = new KeyboardState(keys);
         GamePadInputState[] array = Enumerable.Range(0, 4).Select<int, GamePadInputState>((Func<int, GamePadInputState>) (x => new GamePadInputState())).ToArray<GamePadInputState>();
-        for (int index = 0; index < this._gameControllers.Count; ++index)
+        for (int index = 0; index < this._gameControllers.Count && index < array.Length; ++index)
         {
           IntPtr gameController = this._gameControllers[index];
           SDL.SDL_GameControllerGetJoystick(gameController);

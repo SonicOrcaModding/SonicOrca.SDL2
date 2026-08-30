@@ -43,7 +43,11 @@ namespace SDL2
 		/// <summary>
 		/// Used by DllImport to load the native library.
 		/// </summary>
+#if MONO_NX
+		private const string nativeLibName = "SDL2";
+#else
 		private const string nativeLibName = "SDL2.dll";
+#endif
 
 		#endregion
 

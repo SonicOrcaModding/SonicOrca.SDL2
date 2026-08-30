@@ -12,12 +12,16 @@ namespace SonicOrca.SDL2
 
         internal static void EnsureRegistered()
         {
+#if MONO_NX
+            return;
+#else
             if (_registered)
                 return;
             _registered = true;
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 return;
             NativeLibrary.SetDllImportResolver(typeof(SDL).Assembly, Resolve);
+#endif
         }
 
         private static IntPtr Resolve(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)

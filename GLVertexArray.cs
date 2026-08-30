@@ -54,6 +54,17 @@ namespace SonicOrca.SDL2
       public void Render(SonicOrca.Graphics.PrimitiveType type, int index, int count)
       {
         this.Bind();
+#if MONO_NX
+        if (type == SonicOrca.Graphics.PrimitiveType.Quads)
+        {
+          for (int quad = 0; quad + 3 < count; quad += 4)
+          {
+            int vertex = index + quad;
+            GL.DrawArrays(OpenTK.Graphics.OpenGL.PrimitiveType.TriangleFan, vertex, 4);
+          }
+          return;
+        }
+#endif
         GL.DrawArrays(GLVertexArray.BeginModesForPrimitiveTypes[(int) type], index, count);
       }
     }

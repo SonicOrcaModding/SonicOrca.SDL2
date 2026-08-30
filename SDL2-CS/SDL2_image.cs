@@ -38,7 +38,11 @@ namespace SDL2
 		#region SDL2# Variables
 
 		/* Used by DllImport to load the native library. */
+#if MONO_NX
+		private const string nativeLibName = "SDL2_image";
+#else
 		private const string nativeLibName = "SDL2_image.dll";
+#endif
 
 		#endregion
 
